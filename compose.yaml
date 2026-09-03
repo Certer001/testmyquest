@@ -15,18 +15,6 @@ services:
       timeout: 5s
       retries: 30
 
-  migrate:
-    build:
-      context: .
-      dockerfile: src/Course.Cli/Dockerfile
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      ConnectionStrings__Migration: Host=postgres;Port=5432;Database=course;Username=postgres;Password=postgres
-    command: ["migration", "apply", "/app/migrations"]
-    restart: "no"
-
   api:
     build:
       context: .
@@ -35,11 +23,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
     environment:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__Course: Host=postgres;Port=5432;Database=course;Username=course_runtime;Password=course_runtime
+      ConnectionStrings__Migration: Host=postgres;Port=5432;Database=course;Username=postgres;Password=postgres
       COURSE_JWT_ISSUER: moduledev-course
       COURSE_JWT_AUDIENCE: moduledev-api
       COURSE_JWT_SIGNING_KEY: development-signing-key-at-least-32-bytes

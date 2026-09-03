@@ -15,6 +15,15 @@ var jwtSettings = new JwtSettings
 
 var runtimeConnection = builder.Configuration.GetConnectionString("Course")
     ?? throw new InvalidOperationException("ConnectionStrings:Course is required");
+var migrationConnection = builder.Configuration.GetConnectionString("Migration")
+    ?? throw new InvalidOperationException("ConnectionStrings:Migration is required");
+
+var migrationDirectory = Path.Combine(AppContext.BaseDirectory, "migrations");
+if (Directory.Exists(migrationDirectory))
+{
+    var migrationService = new MigrationService(migrationConnection);
+    await ApplyMigrationsWithRetryAsync(migrationService, migrationDirectory);
+}
 
 builder.Services.AddSingleton(NpgsqlDataSource.Create(runtimeConnection));
 builder.Services.AddSingleton(jwtSettings);
@@ -174,6 +183,33 @@ app.MapPost("/api/{module}/{action}", async (
 });
 
 app.Run();
+
+static async Task ApplyMigrationsWithRetryAsync(MigrationService migrationService, string directory)
+{
+    var delays = new[] { 500, 1000, 2000, 3000, 5000, 5000, 5000, 5000 };
+    Exception? lastError = null;
+
+    foreach (var delay in delays)
+    {
+        try
+        {
+            await migrationService.ApplyAsync(directory);
+            return;
+        }
+        catch (Exception ex) when (ex is NpgsqlException or MigrationConflictException)
+        {
+            lastError = ex;
+            if (ex is MigrationConflictException)
+            {
+                throw;
+            }
+
+            await Task.Delay(delay);
+        }
+    }
+
+    throw lastError ?? new InvalidOperationException("migration apply failed");
+}
 
 public sealed class InitializationState
 {

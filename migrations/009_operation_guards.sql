@@ -1,3 +1,8 @@
+ALTER TABLE course.operations DROP CONSTRAINT IF EXISTS operations_kind_check;
+ALTER TABLE course.operations DROP CONSTRAINT IF EXISTS operations_amount_check;
+ALTER TABLE course.operations DROP CONSTRAINT IF EXISTS operations_currency_check;
+ALTER TABLE course.operations DROP CONSTRAINT IF EXISTS operations_status_check;
+
 ALTER TABLE course.operations
   ADD CONSTRAINT operations_kind_check
     CHECK (operation_kind = 'PAYMENT_EXECUTION'),
