@@ -52,8 +52,14 @@ public static class PayloadBuilder
 
     private static void SetPointer(JsonObject root, string pointer, JsonNode? value)
     {
-        if (value is null || !pointer.StartsWith('/'))
+        if (value is null)
         {
+            return;
+        }
+
+        if (!pointer.StartsWith('/'))
+        {
+            root[pointer] = value;
             return;
         }
 
