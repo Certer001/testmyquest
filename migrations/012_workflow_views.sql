@@ -1,3 +1,32 @@
+CREATE OR REPLACE VIEW autocheck.action_definitions AS
+SELECT
+  av.module,
+  av.action,
+  av.version,
+  av.http_method,
+  av.target_schema,
+  av.target_function,
+  av.outcomes,
+  st.enabled,
+  st.is_default
+FROM course.action_versions av
+JOIN course.action_state st
+  ON st.module = av.module AND st.action = av.action AND st.version = av.version;
+
+CREATE OR REPLACE VIEW autocheck.action_dispatches AS
+SELECT
+  correlation_id,
+  request_id,
+  module,
+  action,
+  version,
+  principal,
+  payload_hash,
+  status,
+  outcome,
+  occurred_at
+FROM course.action_dispatches;
+
 CREATE OR REPLACE VIEW autocheck.flow_versions AS
 SELECT
   flow_name,
@@ -79,6 +108,8 @@ SELECT
 FROM workflow.workflow_events;
 
 GRANT SELECT ON
+  autocheck.action_definitions,
+  autocheck.action_dispatches,
   autocheck.flow_versions,
   autocheck.processes,
   autocheck.steps,
@@ -89,6 +120,8 @@ GRANT SELECT ON
   TO course_runtime, course_publication, workflow_worker;
 
 REVOKE INSERT, UPDATE, DELETE ON
+  autocheck.action_definitions,
+  autocheck.action_dispatches,
   autocheck.flow_versions,
   autocheck.processes,
   autocheck.steps,

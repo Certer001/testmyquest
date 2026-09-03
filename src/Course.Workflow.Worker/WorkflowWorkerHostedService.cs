@@ -62,8 +62,8 @@ public sealed class WorkflowWorkerHostedService(
         await using var connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
             """
-            SELECT claim::text
-            FROM workflow.claim_jobs(@owner, @limit) AS claim
+            SELECT claim_jobs::text
+            FROM workflow.claim_jobs(@owner, @limit)
             """,
             connection);
         command.Parameters.AddWithValue("owner", owner);

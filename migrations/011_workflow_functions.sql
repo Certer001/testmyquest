@@ -139,8 +139,7 @@ BEGIN
   WHERE attempt_id = v_attempt.attempt_id;
 
   UPDATE workflow.jobs
-  SET attempt_count = attempt_count + 1,
-      lease_version = lease_version + 1
+  SET lease_version = lease_version + 1
   WHERE job_id = p_job_id;
 
   PERFORM workflow.append_event(
@@ -437,6 +436,11 @@ BEGIN
   LOOP
     IF v_job.state = 'LEASED' AND coalesce(v_job.lease_until, now()) <= now() THEN
       PERFORM workflow.mark_running_attempt_stale(v_job.job_id);
+      UPDATE workflow.jobs
+      SET state = 'READY',
+          lease_owner = NULL,
+          lease_until = NULL
+      WHERE job_id = v_job.job_id;
       SELECT * INTO v_job FROM workflow.jobs WHERE job_id = v_job.job_id;
     END IF;
 
