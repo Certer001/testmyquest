@@ -21,10 +21,13 @@ public sealed class ClaimedJob
             ExecutionId = ReadGuid(root, "executionId", "execution_id"),
             AttemptId = ReadGuid(root, "attemptId", "attempt_id"),
             LeaseVersion = ReadInt64(root, "leaseVersion", "lease_version"),
-            ProcessData = ReadObject(root, "processData", "process_data"),
-            Action = ActionContract.Parse(ReadObject(root, "action", "action_contract"))
+            ProcessData = CloneElement(ReadObject(root, "processData", "process_data")),
+            Action = ActionContract.Parse(CloneElement(ReadObject(root, "action", "action_contract")))
         };
     }
+
+    private static JsonElement CloneElement(JsonElement element) =>
+        element.ValueKind == JsonValueKind.Undefined ? element : element.Clone();
 
     private static JsonElement ReadObject(JsonElement root, params string[] names)
     {
@@ -196,7 +199,10 @@ public sealed class ActionContract
             if (root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Object)
             {
                 return value.EnumerateObject()
-                    .ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal);
+                    .ToDictionary(
+                        property => property.Name,
+                        property => property.Value.Clone(),
+                        StringComparer.Ordinal);
             }
         }
 

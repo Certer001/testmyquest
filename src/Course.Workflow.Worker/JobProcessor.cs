@@ -11,6 +11,23 @@ public sealed class JobProcessor(
 {
     public async Task ProcessAsync(ClaimedJob job, CancellationToken cancellationToken)
     {
+        try
+        {
+            await ProcessCoreAsync(job, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            await FailJobAsync(
+                job,
+                "internal.error",
+                retryable: true,
+                ex.Message,
+                cancellationToken);
+        }
+    }
+
+    private async Task ProcessCoreAsync(ClaimedJob job, CancellationToken cancellationToken)
+    {
         FailpointGate.MaybeReach("after_job_claim", leaseOwner);
 
         var payload = PayloadBuilder.Build(
@@ -71,6 +88,12 @@ public sealed class JobProcessor(
         if (!finish.Ok)
         {
             await transaction.RollbackAsync(cancellationToken);
+            await FailJobAsync(
+                job,
+                finish.ErrorCode ?? "internal.error",
+                retryable: string.Equals(finish.ErrorCode, "workflow.lease_stale", StringComparison.Ordinal),
+                finish.ErrorMessage ?? "finish_job failed",
+                cancellationToken);
             return;
         }
 
@@ -147,7 +170,7 @@ public sealed class JobProcessor(
         }
 
         var outcome = root.GetProperty("outcome").GetString()!;
-        var result = root.GetProperty("result");
+        var result = root.GetProperty("result").Clone();
         return new InvokeOutcome(true, outcome, result, null, null, false);
     }
 
