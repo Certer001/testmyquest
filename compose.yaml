@@ -1,0 +1,103 @@
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: postgres/Dockerfile
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: course
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d course"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    build:
+      context: .
+      dockerfile: src/Course.Cli/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Migration: Host=postgres;Port=5432;Database=course;Username=postgres;Password=postgres
+    command: ["migration", "apply", "/app/migrations"]
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: src/Course.Api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Course: Host=postgres;Port=5432;Database=course;Username=course_runtime;Password=course_runtime
+      COURSE_JWT_ISSUER: moduledev-course
+      COURSE_JWT_AUDIENCE: moduledev-api
+      COURSE_JWT_SIGNING_KEY: development-signing-key-at-least-32-bytes
+
+  gateway:
+    build:
+      context: .
+      dockerfile: src/Course.Gateway/Dockerfile
+    depends_on:
+      - api
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      API_BASE_URL: http://api:8080
+
+  cli:
+    build:
+      context: .
+      dockerfile: src/Course.Cli/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Publication: Host=postgres;Port=5432;Database=course;Username=course_publication;Password=course_publication
+      ConnectionStrings__Migration: Host=postgres;Port=5432;Database=course;Username=postgres;Password=postgres
+
+  worker-a:
+    image: course-workflow-worker
+    build:
+      context: .
+      dockerfile: src/Course.Workflow.Worker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Workflow: Host=postgres;Port=5432;Database=course;Username=workflow_worker;Password=workflow_worker
+      WORKFLOW_LEASE_OWNER: worker-a
+      COURSE_TEST_PROFILE: "1"
+
+  worker-b:
+    image: course-workflow-worker
+    build:
+      context: .
+      dockerfile: src/Course.Workflow.Worker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Workflow: Host=postgres;Port=5432;Database=course;Username=workflow_worker;Password=workflow_worker
+      WORKFLOW_LEASE_OWNER: worker-b
+      COURSE_TEST_PROFILE: "1"
+
+volumes:
+  pgdata:
