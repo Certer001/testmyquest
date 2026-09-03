@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using YamlDotNet.Serialization;
@@ -109,11 +110,19 @@ public static class FlowMapParser
                 pair => pair.Key.ToString() ?? string.Empty,
                 pair => NormalizeYamlObject(pair.Value),
                 StringComparer.Ordinal),
+            IDictionary<string, object> map => map.ToDictionary(
+                pair => pair.Key,
+                pair => NormalizeYamlObject(pair.Value),
+                StringComparer.Ordinal),
             IList<object> list => list.Select(NormalizeYamlObject).ToList(),
+            string text when TryParseInteger(text, out var integer) => integer,
             string or bool or int or long or double or decimal => value,
             null => null,
             _ => value.ToString() ?? string.Empty
         };
+
+    private static bool TryParseInteger(string text, out long integer) =>
+        long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out integer);
 
     private static string LoadEmbeddedSchema()
     {
